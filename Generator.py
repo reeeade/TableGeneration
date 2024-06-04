@@ -7,7 +7,7 @@ from faker import Faker
 from unidecode import unidecode
 
 # Замените на ваш собственный API ключ
-API_KEY = 'AIzaSyB6auMMoWsG5EP0_j6L8GFknZf1xxNeiuc'
+API_KEY = 'Some key'
 
 # Инициализация клиента Google Maps
 gmaps = googlemaps.Client(key=API_KEY)
