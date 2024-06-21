@@ -134,7 +134,7 @@ def generate_address(country_code):
 
 # Функция генерации имени и фамилии в соответствии со страной
 def generate_name(country_code):
-    fake = Faker({
+    faker = Faker({
                      'ES': 'es_ES',
                      'DE': 'de_DE',
                      'FR': 'fr_FR',
@@ -144,8 +144,8 @@ def generate_name(country_code):
                  }[country_code])
 
     while True:
-        first_name = fake.first_name()
-        last_name = fake.last_name()
+        first_name = faker.first_name()
+        last_name = faker.last_name()
         full_name = f"{first_name} {last_name}"
         normalized_name = normalize_string(full_name)
 
@@ -155,9 +155,11 @@ def generate_name(country_code):
 
 
 # Генерация пользовательских данных
-def generate_user_data(num_users=200):
-    countries = ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
-
+def generate_user_data(num_users=20, country_codes=None):
+    if country_codes is None:
+        countries = ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
+    else:
+        countries = country_codes
     data = []
     for _ in range(num_users):
         country = random.choice(countries)
@@ -169,18 +171,19 @@ def generate_user_data(num_users=200):
             proxy = generate_correct_proxy(country)
             data.append([country, '', password, '', name, address, birth_date, '', proxy])
 
-    columns = ['Geo', 'AppleID', 'pass', 'number', 'name', 'adress', 'birthday', 'creation', 'proxy']
-    df = pd.DataFrame(data, columns=columns)
-    return df
+    columns = ['Geo', 'AppleID', 'pass', 'number', 'name', 'address', 'birthday', 'creation', 'proxy']
+    data_frame = pd.DataFrame(data, columns=columns)
+    return data_frame
 
 
 # Копирование данных в буфер обмена без заголовков
-def copy_to_clipboard(df):
-    csv_data = df.to_csv(index=False, header=False, sep='\t')
+def copy_to_clipboard(data_frame):
+    csv_data = data_frame.to_csv(index=False, header=False, sep='\t')
     pyperclip.copy(csv_data)
     print("Data copied to clipboard successfully.")
 
 
+# ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=200)
+df = generate_user_data(num_users=20, country_codes=['ES', 'DE', 'PL', 'NL'])
 copy_to_clipboard(df)
