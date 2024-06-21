@@ -1,3 +1,4 @@
+import os
 import random
 import string
 import pandas as pd
@@ -7,7 +8,7 @@ from faker import Faker
 from unidecode import unidecode
 
 # Замените на ваш собственный API ключ
-API_KEY = 'Some key'
+API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
 
 # Инициализация клиента Google Maps
 gmaps = googlemaps.Client(key=API_KEY)
@@ -17,7 +18,7 @@ fake = Faker()
 
 
 # Функция генерации пароля
-def generate_strong_compliant_password(length=16):
+def generate_strong_compliant_password(length: int = 16) -> str:
     while True:
         password = ''.join(
             random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits + string.punctuation,
@@ -34,13 +35,13 @@ def generate_strong_compliant_password(length=16):
 
 
 # Функция генерации прокси-адреса
-def generate_correct_proxy(geo_code, port_range=(100, 199)):
+def generate_correct_proxy(geo_code: str, port_range: tuple = (100, 199)) -> str:
     port = random.randint(port_range[0], port_range[1])
     return f"xxfyOfwK90p50KT0:wifi;{geo_code.lower()};;;@proxy.froxy.com:9{port}"
 
 
 # Функция генерации даты рождения
-def generate_birth_date(min_age=21, max_age=27):
+def generate_birth_date(min_age: int = 21, max_age: int = 27) -> str:
     today = pd.Timestamp.today()
     start_date = today - pd.DateOffset(years=max_age)
     end_date = today - pd.DateOffset(years=min_age)
@@ -54,7 +55,7 @@ def normalize_string(input_str):
 
 
 # Функция удаления названия страны из адреса
-def remove_country_from_address(address, country_name):
+def remove_country_from_address(address: str, country_name: str) -> str:
     if address.endswith(country_name):
         address = address[:-(len(country_name) + 2)]  # +2 для ", "
     return address
@@ -108,7 +109,7 @@ city_coordinates = {
 
 
 # Функция генерации реального адреса на основе случайных координат с использованием Google Maps Places API
-def generate_address(country_code):
+def generate_address(country_code: str) -> str or None:
     country_names = {
         'ES': 'Spain',
         'DE': 'Germany',
@@ -133,15 +134,15 @@ def generate_address(country_code):
 
 
 # Функция генерации имени и фамилии в соответствии со страной
-def generate_name(country_code):
+def generate_name(country_code: str) -> str:
     faker = Faker({
-                     'ES': 'es_ES',
-                     'DE': 'de_DE',
-                     'FR': 'fr_FR',
-                     'GB': 'en_GB',
-                     'PL': 'pl_PL',
-                     'NL': 'nl_NL'
-                 }[country_code])
+                      'ES': 'es_ES',
+                      'DE': 'de_DE',
+                      'FR': 'fr_FR',
+                      'GB': 'en_GB',
+                      'PL': 'pl_PL',
+                      'NL': 'nl_NL'
+                  }[country_code])
 
     while True:
         first_name = faker.first_name()
@@ -155,7 +156,7 @@ def generate_name(country_code):
 
 
 # Генерация пользовательских данных
-def generate_user_data(num_users=20, country_codes=None):
+def generate_user_data(num_users: int = 20, country_codes: list = None) -> pd.DataFrame:
     if country_codes is None:
         countries = ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
     else:
@@ -177,7 +178,7 @@ def generate_user_data(num_users=20, country_codes=None):
 
 
 # Копирование данных в буфер обмена без заголовков
-def copy_to_clipboard(data_frame):
+def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
     csv_data = data_frame.to_csv(index=False, header=False, sep='\t')
     pyperclip.copy(csv_data)
     print("Data copied to clipboard successfully.")
