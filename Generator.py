@@ -7,13 +7,17 @@ import googlemaps
 from faker import Faker
 from unidecode import unidecode
 from dotenv import load_dotenv
-from Cityes import city_coordinates
+from Cityes import city_coordinates, radius_data
 
 # Загружаем переменные окружения из файла .env
 load_dotenv()
 
 # Замените на ваш собственный API ключ
 API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
+
+# Проверка наличия API ключа
+if not API_KEY:
+    raise ValueError("GOOGLE_MAPS_API_KEY не установлен в переменных окружения.")
 
 # Инициализация клиента Google Maps
 gmaps = googlemaps.Client(key=API_KEY)
@@ -46,7 +50,7 @@ def generate_correct_proxy(geo_code: str, port_range: tuple = (100, 199)) -> str
 
 
 # Функция генерации даты рождения
-def generate_birth_date(min_age: int = 21, max_age: int = 27) -> str:
+def generate_birth_date(min_age: int = 25, max_age: int = 35) -> str:
     today = pd.Timestamp.today()
     start_date = today - pd.DateOffset(years=max_age)
     end_date = today - pd.DateOffset(years=min_age)
@@ -78,16 +82,33 @@ def generate_address(country_code: str) -> str or None:
     }
     query = 'residential building'
     location = random.choice(city_coordinates[country_code])
-    radius = 30000  # 30 km radius
 
-    response = gmaps.places(query, location=location, radius=radius, language='en')
+    # Определение радиуса на основе координат
+    radius = radius_data[country_code]['border'] if location in radius_data[country_code]['border_cities'] else \
+        radius_data[country_code]['default']
 
-    if response['status'] == 'OK' and response['results']:
-        place = random.choice(response['results'])
-        formatted_address = place.get('formatted_address')
-        if formatted_address:
-            normalized_address = normalize_string(formatted_address)
-            return remove_country_from_address(normalized_address, country_names[country_code])
+    attempts = 0
+    max_attempts = 5  # Максимальное количество попыток для избежания бесконечного цикла
+
+    while attempts < max_attempts:
+        try:
+            response = gmaps.places(query, location=location, radius=radius, language='en')
+        except googlemaps.exceptions.ApiError as e:
+            print(f"Ошибка API: {e}")
+            return None
+        except Exception as e:
+            print(f"Неожиданная ошибка: {e}")
+            return None
+
+        if response['status'] == 'OK' and response['results']:
+            place = random.choice(response['results'])
+            formatted_address = place.get('formatted_address')
+            if formatted_address:
+                normalized_address = normalize_string(formatted_address)
+                if country_names[country_code] in normalized_address:
+                    return remove_country_from_address(normalized_address, country_names[country_code])
+        attempts += 1
+
     return None
 
 
@@ -144,5 +165,5 @@ def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
 
 # ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=20, country_codes=['ES', 'DE', 'PL', 'NL'])
+df = generate_user_data(num_users=3, country_codes=['ES', 'FR', 'PL', 'NL'])
 copy_to_clipboard(df)
