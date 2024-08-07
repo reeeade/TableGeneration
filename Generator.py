@@ -28,6 +28,16 @@ fake = Faker()
 
 # Функция генерации пароля
 def generate_strong_compliant_password(length: int = 16) -> str:
+    """
+    Generates a strong, compliant password with the specified length.
+    The password must contain at least one digit, one lowercase letter, one uppercase letter, and one special character.
+    The first character must be an alphanumeric character and no two consecutive characters should be the same.
+
+    :param length: The desired length of the password (default is 16)
+    :type length: int
+    :return: A strong, compliant password of the specified length
+    :rtype: str
+    """
     while True:
         password = ''.join(
             random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits + string.punctuation,
@@ -45,12 +55,32 @@ def generate_strong_compliant_password(length: int = 16) -> str:
 
 # Функция генерации прокси-адреса
 def generate_correct_proxy(geo_code: str, port_range: tuple = (100, 199)) -> str:
+    """
+    Generates a correct proxy address with a random port within the specified range.
+
+    :param geo_code: The ISO 3166-1 alpha-2 code of the country for which the proxy should be generated.
+    :type geo_code: str
+    :param port_range: A tuple containing the minimum and maximum port numbers for the proxy.
+    :type port_range: tuple
+    :return: A correct proxy address in the format "xxfyOfwK90p50KT0:wifi;{geo_code.lower()};;;@proxy.froxy.com:9{port}"
+    :rtype: str
+    """
     port = random.randint(port_range[0], port_range[1])
     return f"xxfyOfwK90p50KT0:wifi;{geo_code.lower()};;;@proxy.froxy.com:9{port}"
 
 
 # Функция генерации даты рождения
 def generate_birth_date(min_age: int = 25, max_age: int = 35) -> str:
+    """
+    Generates a random birthdate within the specified age range.
+
+    :param min_age: The minimum age of the generated birthdate (default is 25)
+    :type min_age: int
+    :param max_age: The maximum age of the generated birthdate (default is 35)
+    :type max_age: int
+    :return: A random birthdate in the format "dd.mm.yyyy"
+    :rtype: str
+    """
     today = pd.Timestamp.today()
     start_date = today - pd.DateOffset(years=max_age)
     end_date = today - pd.DateOffset(years=min_age)
@@ -65,6 +95,17 @@ def normalize_string(input_str):
 
 # Функция удаления названия страны из адреса
 def remove_country_from_address(address: str, country_name: str) -> str:
+    """
+    Removes the specified country name from the end of the given address.
+    The function assumes that the country name is followed by a comma and a space.
+
+    :param address: The full address string from which the country name should be removed.
+    :type address: str
+    :param country_name: The name of the country to be removed from the address.
+    :type country_name: str
+    :return: The address string with the country name removed.
+    :rtype: str
+    """
     if address.endswith(country_name):
         address = address[:-(len(country_name) + 2)]  # +2 для ", "
     return address
@@ -72,6 +113,14 @@ def remove_country_from_address(address: str, country_name: str) -> str:
 
 # Функция генерации реального адреса на основе случайных координат с использованием Google Maps Places API
 def generate_address(country_code: str) -> str or None:
+    """
+    Generates a real address in a specified country using Google Maps Places API.
+
+    :param country_code: The ISO 3166-1 alpha-2 code of the country for which the address should be generated.
+    :type country_code: str
+    :return: A real address in the specified country, or None if the address could not be generated.
+    :rtype: str or None
+    """
     country_names = {
         'ES': 'Spain',
         'DE': 'Germany',
@@ -114,6 +163,14 @@ def generate_address(country_code: str) -> str or None:
 
 # Функция генерации имени и фамилии в соответствии со страной
 def generate_name(country_code: str) -> str:
+    """
+    Generates a full name for a user based on the specified country code.
+
+    :param country_code: The ISO 3166-1 alpha-2 code of the country for which the name should be generated.
+    :type country_code: str
+    :return: A full name in the format "FirstName LastName" for a user in the specified country.
+    :rtype: str
+    """
     faker = Faker({
                       'ES': 'es_ES',
                       'DE': 'de_DE',
@@ -136,6 +193,17 @@ def generate_name(country_code: str) -> str:
 
 # Генерация пользовательских данных
 def generate_user_data(num_users: int = 20, country_codes: list = None) -> pd.DataFrame:
+    """
+    Generates a DataFrame containing user data for the specified number of users.
+
+    :param num_users: The number of users for which data should be generated. Default is 20.
+    :type num_users: int
+    :param country_codes: A list of ISO 3166-1 alpha-2 country codes for which data should be generated.
+    If not provided, the function will generate data for six predefined countries.
+    :type country_codes: list
+    :return: A DataFrame containing user data, including country, address, birthdate, name, and password.
+    :rtype: pd.DataFrame
+    """
     if country_codes is None:
         countries = ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
     else:
@@ -158,6 +226,14 @@ def generate_user_data(num_users: int = 20, country_codes: list = None) -> pd.Da
 
 # Копирование данных в буфер обмена без заголовков
 def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
+    """
+    Copies the DataFrame data to the clipboard without headers.
+
+    :param data_frame: A pandas DataFrame containing the data to be copied to the clipboard.
+    :type data_frame: pd.DataFrame
+    :return: None
+    :rtype: None
+    """
     csv_data = data_frame.to_csv(index=False, header=False, sep='\t')
     pyperclip.copy(csv_data)
     print("Data copied to clipboard successfully.")
@@ -165,5 +241,5 @@ def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
 
 # ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=3, country_codes=['ES', 'FR', 'PL', 'NL'])
+df = generate_user_data(num_users=20, country_codes=['ES', 'DE', 'FR', 'PL', 'NL'])
 copy_to_clipboard(df)
