@@ -62,11 +62,12 @@ def generate_correct_proxy(geo_code: str, port_range: tuple = (100, 199)) -> str
     :type geo_code: str
     :param port_range: A tuple containing the minimum and maximum port numbers for the proxy.
     :type port_range: tuple
-    :return: A correct proxy address in the format "xxfyOfwK90p50KT0:wifi;{geo_code.lower()};;;@proxy.froxy.com:9{port}"
+    :return: A correct proxy address in the format
+                                        "socks5://xxfyOfwK90p50KT0:wifi;{geo_code.lower()};;;@proxy.froxy.com:9{port}"
     :rtype: str
     """
     port = random.randint(port_range[0], port_range[1])
-    return f"xxfyOfwK90p50KT0:wifi;{geo_code.lower()};;;@proxy.froxy.com:9{port}"
+    return f"socks5://xxfyOfwK90p50KT0:wifi;{geo_code.lower()};;;@proxy.froxy.com:9{port}"
 
 
 # Функция генерации даты рождения
@@ -241,5 +242,5 @@ def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
 
 # ['ES', 'DE', 'FR', 'GB', 'PL', 'NL']
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=20, country_codes=['ES', 'DE', 'FR', 'PL', 'NL'])
+df = generate_user_data(num_users=20, country_codes=['ES', 'DE', 'FR', 'GB', 'PL', 'NL'])
 copy_to_clipboard(df)
