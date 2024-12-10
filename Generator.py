@@ -34,6 +34,9 @@ country_locales = {
     'AT': 'de_AT',
     'DK': 'da_DK',
     'UA': 'uk_UA',
+    'RO': 'ro_RO',
+    'EE': 'et_EE',
+    'LV': 'lv_LV',
 }
 
 # Сопоставление кода страны с названием страны
@@ -47,6 +50,9 @@ country_names = {
     'AT': 'Austria',
     'DK': 'Denmark',
     'UA': 'Ukraine',
+    'RO': 'Romania',
+    'EE': 'Estonia',
+    'LV': 'Latvia',
 }
 
 # Предварительная инициализация объектов Faker для каждой локали
@@ -230,8 +236,8 @@ def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
         print(f"Не удалось скопировать данные в буфер обмена: {e}")
 
 
-# 'ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK', 'UA'
+# 'ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK', 'UA','RO', 'EE', 'LV'
 
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=20, country_codes=['UA'])
+df = generate_user_data(num_users=10, country_codes=['RO', 'EE', 'LV'])
 copy_to_clipboard(df)
