@@ -8,7 +8,7 @@ from faker import Faker
 from unidecode import unidecode
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from Cityes import city_coordinates, radius_data
+from Cityes import city_coordinates, radius_data, country_names, country_locales
 
 # Загрузка переменных окружения из файла .env
 load_dotenv()
@@ -22,38 +22,6 @@ if not API_KEY:
 
 # Инициализация клиента Google Maps
 gmaps = googlemaps.Client(key=API_KEY)
-
-# Сопоставление кода страны с локалью для Faker
-country_locales = {
-    'ES': 'es_ES',
-    'DE': 'de_DE',
-    'FR': 'fr_FR',
-    'GB': 'en_GB',
-    'PL': 'pl_PL',
-    'NL': 'nl_NL',
-    'AT': 'de_AT',
-    'DK': 'da_DK',
-    'UA': 'uk_UA',
-    'RO': 'ro_RO',
-    'EE': 'et_EE',
-    'LV': 'lv_LV',
-}
-
-# Сопоставление кода страны с названием страны
-country_names = {
-    'ES': 'Spain',
-    'DE': 'Germany',
-    'FR': 'France',
-    'GB': 'United Kingdom',
-    'PL': 'Poland',
-    'NL': 'Netherlands',
-    'AT': 'Austria',
-    'DK': 'Denmark',
-    'UA': 'Ukraine',
-    'RO': 'Romania',
-    'EE': 'Estonia',
-    'LV': 'Latvia',
-}
 
 # Предварительная инициализация объектов Faker для каждой локали
 faker_objects = {code: Faker(locale) for code, locale in country_locales.items()}

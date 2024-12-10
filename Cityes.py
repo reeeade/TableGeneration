@@ -1,4 +1,35 @@
 # Cityes.py
+# Сопоставление кода страны с локалью для Faker
+country_locales = {
+    'ES': 'es_ES',
+    'DE': 'de_DE',
+    'FR': 'fr_FR',
+    'GB': 'en_GB',
+    'PL': 'pl_PL',
+    'NL': 'nl_NL',
+    'AT': 'de_AT',
+    'DK': 'da_DK',
+    'UA': 'uk_UA',
+    'RO': 'ro_RO',
+    'EE': 'et_EE',
+    'LV': 'lv_LV',
+}
+
+# Сопоставление кода страны с названием страны
+country_names = {
+    'ES': 'Spain',
+    'DE': 'Germany',
+    'FR': 'France',
+    'GB': 'United Kingdom',
+    'PL': 'Poland',
+    'NL': 'Netherlands',
+    'AT': 'Austria',
+    'DK': 'Denmark',
+    'UA': 'Ukraine',
+    'RO': 'Romania',
+    'EE': 'Estonia',
+    'LV': 'Latvia',
+}
 
 city_coordinates = {
     'ES': [
