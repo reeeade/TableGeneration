@@ -32,7 +32,8 @@ country_locales = {
     'PL': 'pl_PL',
     'NL': 'nl_NL',
     'AT': 'de_AT',
-    'DK': 'da_DK'
+    'DK': 'da_DK',
+    'UA': 'uk_UA',
 }
 
 # Сопоставление кода страны с названием страны
@@ -44,7 +45,8 @@ country_names = {
     'PL': 'Poland',
     'NL': 'Netherlands',
     'AT': 'Austria',
-    'DK': 'Denmark'
+    'DK': 'Denmark',
+    'UA': 'Ukraine',
 }
 
 # Предварительная инициализация объектов Faker для каждой локали
@@ -227,8 +229,9 @@ def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
     except pyperclip.PyperclipException as e:
         print(f"Не удалось скопировать данные в буфер обмена: {e}")
 
-#'ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK'
+
+# 'ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK', 'UA'
 
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=20, country_codes=['ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK'])
+df = generate_user_data(num_users=20, country_codes=['UA'])
 copy_to_clipboard(df)
