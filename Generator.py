@@ -204,8 +204,8 @@ def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
         print(f"Не удалось скопировать данные в буфер обмена: {e}")
 
 
-# 'ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK', 'UA','RO', 'EE', 'LV', 'LT', 'BG']
+# 'ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK', 'UA','RO', 'EE', 'LV', 'LT', 'BG', 'GE']
 
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=10, country_codes=['RO', 'EE', 'LV'])
+df = generate_user_data(num_users=10, country_codes=['GE'])
 copy_to_clipboard(df)
