@@ -207,5 +207,5 @@ def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
 # 'ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK', 'UA','RO', 'EE', 'LV', 'LT', 'BG', 'GE']
 
 # Генерация пользовательских данных и копирование в буфер обмена
-df = generate_user_data(num_users=10, country_codes=['GE'])
+df = generate_user_data(num_users=10, country_codes=['ES', 'DE', 'FR', 'GB', 'PL', 'NL', 'AT', 'DK'])
 copy_to_clipboard(df)
