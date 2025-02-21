@@ -1,6 +1,14 @@
-# Cityes.py
-# Сопоставление кода страны с локалью для Faker
-country_locales = {
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Получение API-ключа Google Maps
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY")
+if not GOOGLE_MAPS_API_KEY:
+    raise ValueError("GOOGLE_MAPS_API_KEY не установлен в переменных окружения.")
+
+COUNTRY_LOCALES = {
     'ES': 'es_ES',
     'DE': 'de_DE',
     'FR': 'fr_FR',
@@ -22,7 +30,7 @@ country_locales = {
 }
 
 # Сопоставление кода страны с названием страны
-country_names = {
+COUNTRY_NAMES = {
     'ES': 'Spain',
     'DE': 'Germany',
     'FR': 'France',
@@ -43,7 +51,7 @@ country_names = {
     'IT': 'Italy',
 }
 
-city_coordinates = {
+CITY_COORDINATES = {
     'ES': [
         '40.416775,-3.703790',  # Madrid
         '41.385064,2.173403',  # Barcelona
@@ -301,7 +309,7 @@ city_coordinates = {
     ],
 }
 
-radius_data = {
+RADIUS_DATA = {
     'ES': {
         'default': 30000,
         'border': 20000,
