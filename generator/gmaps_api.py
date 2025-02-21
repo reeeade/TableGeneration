@@ -1,6 +1,7 @@
 import random
 import logging
 import time
+import re
 from typing import Optional
 import googlemaps
 from config import GOOGLE_MAPS_API_KEY, CITY_COORDINATES, RADIUS_DATA, COUNTRY_NAMES
@@ -14,15 +15,16 @@ def generate_address(country_code: str) -> Optional[str]:
     """
     Генерирует адрес жилого здания в заданной стране с использованием Google Maps Places API.
 
-    Функция запрашивает подробности места для получения структурированных
+    Функция запрашивает подробности места (Place Details) для получения структурированных
     компонентов адреса и формирует строку в формате:
       "улица номер дома, почтовый индекс город[, административная единица]".
+
+    Обязательно должен присутствовать номер дома.
 
     Допустимые значения для параметра fields см. в документации:
     https://developers.google.com/maps/documentation/places/web-service/details#fields
     """
-    # Попробуйте изменить запрос, если "residential address" не даёт нужного результата
-    query = "residential building"
+    query = "residential building"  # уточнённый запрос для поиска жилых домов
     locations = CITY_COORDINATES.get(country_code, [])
     if not locations:
         logging.error(f"Нет координат для страны: {country_code}")
@@ -56,7 +58,7 @@ def generate_address(country_code: str) -> Optional[str]:
                 result = details.get("result", {})
                 if not result:
                     formatted = place.get("formatted_address")
-                    if formatted:
+                    if formatted and re.search(r'\d+', formatted):
                         return normalize_string(formatted)
                     continue
 
@@ -65,17 +67,34 @@ def generate_address(country_code: str) -> Optional[str]:
                     continue
 
                 # Извлекаем компоненты адреса
-                street_number = next((comp["long_name"] for comp in address_components
-                                      if "street_number" in comp.get("types", [])), None)
-                route = next((comp["long_name"] for comp in address_components
-                              if "route" in comp.get("types", [])), None)
-                postal_code = next((comp["long_name"] for comp in address_components
-                                    if "postal_code" in comp.get("types", [])), None)
-                locality = next((comp["long_name"] for comp in address_components
-                                 if "locality" in comp.get("types", [])), None)
-                administrative_area = next((comp["long_name"] for comp in address_components
-                                            if "administrative_area_level_1" in comp.get("types", [])), None)
+                street_number = next(
+                    (comp["long_name"] for comp in address_components if "street_number" in comp.get("types", [])),
+                    None,
+                )
+                route = next(
+                    (comp["long_name"] for comp in address_components if "route" in comp.get("types", [])),
+                    None,
+                )
+                postal_code = next(
+                    (comp["long_name"] for comp in address_components if "postal_code" in comp.get("types", [])),
+                    None,
+                )
+                locality = next(
+                    (comp["long_name"] for comp in address_components if "locality" in comp.get("types", [])),
+                    None,
+                )
+                administrative_area = next(
+                    (comp["long_name"] for comp in address_components if
+                     "administrative_area_level_1" in comp.get("types", [])),
+                    None,
+                )
 
+                # Если номер дома отсутствует, считаем адрес недействительным
+                if not street_number:
+                    logging.info("Номер дома не найден в адресе, повторяем запрос...")
+                    raise ValueError("Номер дома обязателен")
+
+                # Если все ключевые компоненты получены, формируем адрес
                 if route and street_number and postal_code and locality:
                     formatted_address = f"{route} {street_number}, {postal_code} {locality}"
                     if administrative_area:
@@ -85,8 +104,9 @@ def generate_address(country_code: str) -> Optional[str]:
                         return remove_country_from_address(normalized, COUNTRY_NAMES[country_code])
                     return normalized
                 else:
+                    # Фолбэк: если структурированные компоненты неполные, проверяем fallback-адрес
                     formatted_address = result.get("formatted_address")
-                    if formatted_address:
+                    if formatted_address and re.search(r'\d+', formatted_address):
                         return normalize_string(formatted_address)
         except googlemaps.exceptions.ApiError as e:
             logging.error(f"Google Maps API error: {e}")
@@ -98,5 +118,5 @@ def generate_address(country_code: str) -> Optional[str]:
         logging.info(f"Попытка {attempt}/{max_attempts} не удалась, повтор через {sleep_time} сек...")
         time.sleep(sleep_time)
 
-    logging.error("Не удалось получить адрес после нескольких попыток.")
+    logging.error("Не удалось получить адрес с номером дома после нескольких попыток.")
     return None
