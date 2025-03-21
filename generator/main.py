@@ -12,7 +12,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     # Здесь можно выбрать нужные страны из списка выше
-    selected_countries = ["ES", "DE", "FR", "GB", "PL", "AT"]
+    selected_countries = ["ES", "DE", "FR", "GB", "PL", "NL", "FI", "CZ", "IT"]
 
     df = generate_user_data(num_users=10, country_codes=selected_countries)
     copy_to_clipboard(df)
