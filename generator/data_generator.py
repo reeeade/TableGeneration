@@ -3,13 +3,20 @@ import random
 import pandas as pd
 import asyncio
 from faker import Faker
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import uuid
+import functools
+import time
 
-from config import COUNTRY_LOCALES, USER_GEN_CONFIG
+from config import (
+    COUNTRY_LOCALES,
+    USER_GEN_CONFIG,
+    COUNTRY_NAMES,
+    get_country_phone_code
+)
 from gmaps_api import generate_address
 from utils import (
     generate_birth_date,
@@ -20,16 +27,82 @@ from utils import (
     generate_phone_number,
     run_concurrent_tasks
 )
-from models import User
+from models import User, UserProfile
 from dataclasses import asdict
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
-# Инициализация объектов Faker для каждой локали
-faker_objects = {code: Faker(locale) for code, locale in COUNTRY_LOCALES.items()}
-# Добавляем запасной Faker для случаев, когда локаль не найдена
-faker_objects['default'] = Faker()
+# Инициализация кэша Faker объектов
+faker_cache = {}
+
+
+def get_faker_for_country(country_code: str) -> Faker:
+    """
+    Возвращает объект Faker для указанной страны с кэшированием.
+    Если локаль недоступна, возвращает Faker с локалью en_US.
+
+    Args:
+        country_code: Код страны
+
+    Returns:
+        Объект Faker для указанной страны
+    """
+    # Если объект уже создан, возвращаем его из кэша
+    if country_code in faker_cache:
+        return faker_cache[country_code]
+
+    # Получаем локаль для страны
+    locale = COUNTRY_LOCALES.get(country_code, 'en_US')
+
+    try:
+        # Пробуем создать Faker с указанной локалью
+        faker = Faker(locale)
+        # Проверяем, что локаль работает (пытаемся получить имя)
+        faker.name()
+        # Сохраняем в кэш
+        faker_cache[country_code] = faker
+        logger.debug(f"Создан Faker для локали {locale} (страна {country_code})")
+        return faker
+    except Exception as e:
+        logger.warning(f"Не удалось инициализировать локаль {locale} для страны {country_code}: {e}")
+        # Если локаль не поддерживается, используем en_US
+        fallback_faker = Faker('en_US')
+        faker_cache[country_code] = fallback_faker
+        return fallback_faker
+
+
+# Инициализация дефолтного Faker
+default_faker = Faker('en_US')
+faker_cache['default'] = default_faker
+
+
+def retry_on_failure(max_retries=3, delay=1):
+    """
+    Декоратор для повтора функции при возникновении ошибки.
+
+    Args:
+        max_retries: Максимальное количество повторных попыток
+        delay: Задержка между попытками в секундах
+    """
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Попытка {attempt + 1} не удалась: {e}. Повтор через {delay} сек...")
+                        time.sleep(delay)
+                    else:
+                        logger.error(f"Все {max_retries} попытки не удались: {e}")
+                        raise
+
+        return wrapper
+
+    return decorator
 
 
 def generate_name(country_code: str) -> str:
@@ -42,7 +115,7 @@ def generate_name(country_code: str) -> str:
     Returns:
         Нормализованное полное имя
     """
-    faker = faker_objects.get(country_code, faker_objects['default'])
+    faker = get_faker_for_country(country_code)
 
     max_attempts = 5
     for _ in range(max_attempts):
@@ -57,8 +130,8 @@ def generate_name(country_code: str) -> str:
 
     # Если после нескольких попыток не получили подходящее имя, генерируем с помощью default Faker
     logger.warning(f"Не удалось сгенерировать подходящее имя для страны {country_code}, использую запасной вариант")
-    first_name = faker_objects['default'].first_name()
-    last_name = faker_objects['default'].last_name()
+    first_name = default_faker.first_name()
+    last_name = default_faker.last_name()
     full_name = f"{first_name} {last_name}"
     return normalize_string(full_name)
 
@@ -96,6 +169,33 @@ def generate_creation_date() -> str:
     return f"{day:02d}.{month:02d}.{year}"
 
 
+def generate_user_profile(user_id: str, country_code: str) -> Dict[str, Any]:
+    """
+    Генерирует расширенный профиль пользователя.
+
+    Args:
+        user_id: ID пользователя
+        country_code: Код страны
+
+    Returns:
+        Словарь с данными профиля пользователя
+    """
+    faker = get_faker_for_country(country_code)
+
+    # Генерируем данные профиля
+    profile = UserProfile(
+        user_id=user_id,
+        language=faker.language_name(),
+        currency=faker.currency_code(),
+        time_zone=faker.timezone(),
+        payment_method=random.choice(['card', 'paypal', 'apple_pay', 'google_pay', None]),
+        notification_settings='{"email": true, "push": true, "sms": false}',
+        device_info='{"os": "iOS", "model": "iPhone 13", "browser": "Safari"}'
+    )
+
+    return asdict(profile)
+
+
 async def create_user_record(country: str) -> Dict[str, Any]:
     """
     Асинхронно создает запись пользователя для указанной страны.
@@ -113,17 +213,23 @@ async def create_user_record(country: str) -> Dict[str, Any]:
         try:
             address = generate_address(country)
             if address:
-                # Генерируем остальные данные
+                # Генерируем основные данные
+                user_id = str(uuid.uuid4())
                 name = generate_name(country)
                 email = generate_email(name)
                 birth_date = generate_birth_date()
                 password = generate_strong_compliant_password()
                 proxy = generate_correct_proxy(country)
-                phone = generate_phone_number(country)
+
+                # Генерируем телефонный номер на основе кода страны
+                country_code = get_country_phone_code(country)
+                phone = generate_phone_number(country, country_code)
+
                 creation_date = generate_creation_date()
 
+                # Создаем основную запись пользователя
                 user = User(
-                    id=str(uuid.uuid4()),
+                    id=user_id,
                     geo=country,
                     apple_id=email,
                     password=password,
@@ -134,7 +240,14 @@ async def create_user_record(country: str) -> Dict[str, Any]:
                     creation=creation_date,
                     proxy=proxy,
                 )
-                return asdict(user)
+
+                # Создаем запись в виде словаря
+                user_data = asdict(user)
+
+                # Добавляем информацию о стране в формате ISO и название
+                user_data['country_name'] = COUNTRY_NAMES.get(country, country)
+
+                return user_data
 
             attempts += 1
             logger.info(f"Не удалось получить адрес для страны {country} (попытка {attempts}/{max_attempts}).")
@@ -150,16 +263,21 @@ async def create_user_record(country: str) -> Dict[str, Any]:
         f"Не удалось получить адрес для страны {country} после {max_attempts} попыток. Запись будет создана с пустым адресом.")
 
     # Создаем запись с пустым адресом
+    user_id = str(uuid.uuid4())
     name = generate_name(country)
     email = generate_email(name)
     birth_date = generate_birth_date()
     password = generate_strong_compliant_password()
     proxy = generate_correct_proxy(country)
-    phone = generate_phone_number(country)
+
+    # Генерируем телефонный номер на основе кода страны
+    country_code = get_country_phone_code(country)
+    phone = generate_phone_number(country, country_code)
+
     creation_date = generate_creation_date()
 
     user = User(
-        id=str(uuid.uuid4()),
+        id=user_id,
         geo=country,
         apple_id=email,
         password=password,
@@ -170,7 +288,14 @@ async def create_user_record(country: str) -> Dict[str, Any]:
         creation=creation_date,
         proxy=proxy,
     )
-    return asdict(user)
+
+    # Создаем запись в виде словаря
+    user_data = asdict(user)
+
+    # Добавляем информацию о стране в формате ISO и название
+    user_data['country_name'] = COUNTRY_NAMES.get(country, country)
+
+    return user_data
 
 
 async def generate_user_data_async(num_users: int = 20, country_codes: Optional[List[str]] = None) -> pd.DataFrame:
@@ -186,6 +311,20 @@ async def generate_user_data_async(num_users: int = 20, country_codes: Optional[
     """
     if country_codes is None:
         country_codes = list(COUNTRY_LOCALES.keys())
+    else:
+        # Проверяем, что все коды стран существуют
+        valid_country_codes = []
+        for code in country_codes:
+            if code in COUNTRY_LOCALES:
+                valid_country_codes.append(code)
+            else:
+                logger.warning(f"Код страны {code} не найден в списке поддерживаемых стран")
+
+        if not valid_country_codes:
+            logger.error("Ни один из указанных кодов стран не найден в списке поддерживаемых стран")
+            country_codes = ['US']  # Используем США по умолчанию
+        else:
+            country_codes = valid_country_codes
 
     # Распределяем пользователей по странам
     countries = random.choices(country_codes, k=num_users)
@@ -234,7 +373,8 @@ def generate_user_data(num_users: int = 20, country_codes: Optional[List[str]] =
         logger.exception(f"Ошибка при генерации данных пользователей: {e}")
         # Возвращаем пустой DataFrame с теми же столбцами
         return pd.DataFrame(columns=[
-            'id', 'geo', 'apple_id', 'password', 'number', 'name', 'address', 'birthday', 'creation', 'proxy'
+            'id', 'geo', 'apple_id', 'password', 'number', 'name', 'address', 'birthday', 'creation', 'proxy',
+            'country_name'
         ])
     finally:
         if not loop.is_running():
@@ -269,3 +409,92 @@ def generate_batch_user_data(batch_configs: List[Dict[str, Any]]) -> Dict[str, p
             result[name] = pd.DataFrame()
 
     return result
+
+
+def generate_large_dataset(total_users: int, batch_size: int = 100,
+                           country_codes: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Генерирует большой набор данных пользователей по частям для экономии памяти.
+
+    Args:
+        total_users: Общее количество пользователей для генерации
+        batch_size: Размер каждой партии
+        country_codes: Список кодов стран. Если None, используются все доступные страны.
+
+    Returns:
+        DataFrame с данными пользователей
+    """
+    logger.info(f"Генерация большого набора данных: {total_users} пользователей (размер партии: {batch_size})")
+
+    # Определяем количество полных партий и остаток
+    full_batches = total_users // batch_size
+    remainder = total_users % batch_size
+
+    data_frames = []
+
+    # Генерируем полные партии
+    for i in range(full_batches):
+        logger.info(f"Генерация партии {i + 1}/{full_batches + 1}")
+        df = generate_user_data(batch_size, country_codes)
+        data_frames.append(df)
+
+    # Генерируем оставшуюся партию, если есть
+    if remainder > 0:
+        logger.info(f"Генерация финальной партии {full_batches + 1}/{full_batches + 1} ({remainder} пользователей)")
+        df = generate_user_data(remainder, country_codes)
+        data_frames.append(df)
+
+    # Объединяем все партии в один DataFrame
+    if data_frames:
+        return pd.concat(data_frames, ignore_index=True)
+    else:
+        return pd.DataFrame()
+
+
+def validate_user_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
+    """
+    Проверяет данные пользователей на корректность и возвращает отфильтрованные данные и список ошибок.
+
+    Args:
+        df: DataFrame с данными пользователей
+
+    Returns:
+        Кортеж из очищенного DataFrame и списка записей с ошибками
+    """
+    errors = []
+    valid_data = []
+
+    for _, row in df.iterrows():
+        row_dict = row.to_dict()
+        error_found = False
+        error_details = {'id': row_dict.get('id', 'unknown'), 'errors': []}
+
+        # Проверка наличия необходимых полей
+        required_fields = ['id', 'geo', 'apple_id', 'password', 'name']
+        for field in required_fields:
+            if field not in row_dict or not row_dict[field]:
+                error_details['errors'].append(f"Отсутствует обязательное поле: {field}")
+                error_found = True
+
+        # Проверка формата email
+        if 'apple_id' in row_dict and row_dict['apple_id'] and '@' not in row_dict['apple_id']:
+            error_details['errors'].append("Некорректный формат email")
+            error_found = True
+
+        # Проверка длины пароля
+        if 'password' in row_dict and row_dict['password'] and len(row_dict['password']) < 8:
+            error_details['errors'].append("Пароль слишком короткий (менее 8 символов)")
+            error_found = True
+
+        # Добавляем запись в соответствующий список
+        if error_found:
+            errors.append(error_details)
+        else:
+            valid_data.append(row_dict)
+
+    # Создаем DataFrame из корректных записей
+    valid_df = pd.DataFrame(valid_data)
+
+    return valid_df, errors
+
+# Функции экспорта данных в различные форматы будут реализованы в clipboard_utils.py

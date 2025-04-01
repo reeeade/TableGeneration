@@ -339,45 +339,104 @@ def generate_email(name: str, domain: str = None) -> str:
     return email.lower()
 
 
-def generate_phone_number(country_code: str) -> str:
+# Дополнение к utils.py - улучшенная генерация телефонных номеров
+
+def generate_phone_number(country_code: str, phone_prefix: str = None) -> str:
     """
-    Генерирует телефонный номер для указанной страны.
+    Генерирует телефонный номер для указанной страны с учетом международного формата.
 
     Args:
         country_code: Код страны (например, 'US', 'GB', и т.д.)
+        phone_prefix: Международный телефонный код (например, '+1', '+44')
+            Если не указан, будет использован код по умолчанию из конфигурации
 
     Returns:
         Строка с телефонным номером в международном формате
     """
-    # Словарь кодов стран и форматов номеров
-    country_phone_formats = {
-        'US': '+1{}{}{}{}{}{}{}{}{}{} формат +1XXXXXXXXXX',
-        'CA': '+1{}{}{}{}{}{}{}{}{}{} формат +1XXXXXXXXXX',
-        'GB': '+44{}{}{}{}{}{}{}{}{} формат +44XXXXXXXXX',
-        'DE': '+49{}{}{}{}{}{}{}{}{} формат +49XXXXXXXXX',
-        'FR': '+33{}{}{}{}{}{}{}{}{} формат +33XXXXXXXXX',
-        'IT': '+39{}{}{}{}{}{}{}{}{}{} формат +39XXXXXXXXXX',
-        'ES': '+34{}{}{}{}{}{}{}{}{} формат +34XXXXXXXXX',
-        'JP': '+81{}{}{}{}{}{}{}{}{}{} формат +81XXXXXXXXXX',
-        'AU': '+61{}{}{}{}{}{}{}{}{} формат +61XXXXXXXXX',
-        'CN': '+86{}{}{}{}{}{}{}{}{}{}{} формат +86XXXXXXXXXXX',
-        'IN': '+91{}{}{}{}{}{}{}{}{}{} формат +91XXXXXXXXXX',
-        'RU': '+7{}{}{}{}{}{}{}{}{}{} формат +7XXXXXXXXXX',
-        'BR': '+55{}{}{}{}{}{}{}{}{}{}{} формат +55XXXXXXXXXXX',
-        'KR': '+82{}{}{}{}{}{}{}{}{}{} формат +82XXXXXXXXXX',
+    from config import get_country_phone_code
+    import random
+
+    # Если префикс не указан, получаем его из конфигурации
+    if not phone_prefix:
+        phone_prefix = get_country_phone_code(country_code)
+
+    # Словарь форматов номеров для разных стран
+    # Формат: [длина номера без кода, количество цифр в коде города/оператора]
+    phone_formats = {
+        'US': [10, 3],  # +1 XXX XXXXXXX
+        'CA': [10, 3],  # +1 XXX XXXXXXX
+        'GB': [10, 3],  # +44 XXX XXXXXXX
+        'DE': [10, 3],  # +49 XXX XXXXXXX
+        'FR': [9, 1],  # +33 X XXXXXXXX
+        'IT': [10, 2],  # +39 XX XXXXXXXX
+        'ES': [9, 2],  # +34 XX XXXXXXX
+        'JP': [10, 2],  # +81 XX XXXXXXXX
+        'AU': [9, 2],  # +61 XX XXXXXXX
+        'CN': [11, 2],  # +86 XX XXXXXXXXX
+        'IN': [10, 3],  # +91 XXX XXXXXXX
+        'RU': [10, 3],  # +7 XXX XXXXXXX
+        'BR': [11, 2],  # +55 XX XXXXXXXXX
+        'KR': [10, 2],  # +82 XX XXXXXXXX
     }
 
-    # Значение по умолчанию, если код страны не найден
-    default_format = '+1{}{}{}{}{}{}{}{}{}{} формат +1XXXXXXXXXX'
+    # Получаем формат для указанной страны или используем США как значение по умолчанию
+    phone_format = phone_formats.get(country_code, [10, 3])  # По умолчанию как в США
 
-    # Получаем формат для указанной страны или используем значение по умолчанию
-    phone_format = country_phone_formats.get(country_code, default_format)
+    # Длина номера и длина кода города/оператора
+    total_length, area_code_length = phone_format
+    subscriber_length = total_length - area_code_length
 
-    # Заменяем каждый {} случайной цифрой
-    digits = [str(random.randint(0, 9)) for _ in range(phone_format.count("{}"))]
+    # Генерируем код города/оператора
+    # В некоторых странах первая цифра кода не может быть 0 или 1
+    area_code = ""
+    for i in range(area_code_length):
+        if i == 0 and country_code in ['US', 'CA']:
+            # В США и Канаде первая цифра кода города не может быть 0 или 1
+            area_code += str(random.randint(2, 9))
+        else:
+            area_code += str(random.randint(0, 9))
 
-    # Форматируем номер телефона
-    formatted_phone = phone_format.format(*digits)
+    # Генерируем номер абонента
+    subscriber = ''.join(str(random.randint(0, 9)) for _ in range(subscriber_length))
 
-    # Возвращаем только номер без дополнительной информации о формате
-    return formatted_phone.split(' формат ')[0]
+    # Форматируем телефон в зависимости от страны
+    if country_code in ['US', 'CA']:
+        # Формат: +1 (XXX) XXX-XXXX
+        formatted_phone = f"{phone_prefix} ({area_code}) {subscriber[:3]}-{subscriber[3:]}"
+    elif country_code == 'GB':
+        # Формат: +44 XXXX XXXXXX
+        formatted_phone = f"{phone_prefix} {area_code} {subscriber}"
+    elif country_code in ['DE', 'FR', 'IT', 'ES']:
+        # Европейский формат: +XX XXX XXXXXXX
+        formatted_phone = f"{phone_prefix} {area_code} {subscriber}"
+    elif country_code in ['JP', 'CN', 'KR']:
+        # Азиатский формат: +XX XX XXXXXXXX
+        formatted_phone = f"{phone_prefix} {area_code} {subscriber}"
+    else:
+        # Общий формат: +XXX XXXXXXXXXX
+        formatted_phone = f"{phone_prefix} {area_code}{subscriber}"
+
+    return formatted_phone
+
+
+# Функция для проверки валидности телефонного номера
+def is_valid_phone_number(phone_number: str) -> bool:
+    """
+    Проверяет, является ли строка действительным телефонным номером.
+
+    Args:
+        phone_number: Телефонный номер для проверки
+
+    Returns:
+        True, если номер валидный, иначе False
+    """
+    import re
+
+    # Удаляем все нецифровые символы кроме "+"
+    cleaned_number = ''.join(c for c in phone_number if c.isdigit() or c == '+')
+
+    # Проверяем, что номер начинается с + и содержит не менее 10 цифр
+    if re.match(r'^\+\d{10,15}$', cleaned_number):
+        return True
+
+    return False
