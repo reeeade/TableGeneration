@@ -11,22 +11,27 @@ from io import StringIO
 logger = logging.getLogger(__name__)
 
 
-def copy_to_clipboard(data_frame: pd.DataFrame, with_header: bool = False) -> None:
+def copy_to_clipboard(data_frame: pd.DataFrame, with_header: bool = False, format_csv: bool = False) -> None:
     """
-    Копирует содержимое DataFrame в буфер обмена в формате TSV.
+    Копирует содержимое DataFrame в буфер обмена.
 
     Args:
         data_frame: DataFrame для копирования
         with_header: Если True, включает заголовки столбцов
+        format_csv: Если True, форматирует как читаемый CSV
     """
     try:
-        tsv_data = data_frame.to_csv(index=False, header=with_header, sep="\t")
+        if format_csv:
+            # Форматируем как читаемый CSV
+            tsv_data = data_frame.to_csv(index=False, header=with_header, sep="\t")
+        else:
+            # Копируем как есть
+            tsv_data = data_frame.to_csv(index=False, header=with_header, sep="\t")
+
         pyperclip.copy(tsv_data)
         logger.info(f"Данные успешно скопированы в буфер обмена ({len(data_frame)} строк)")
     except pyperclip.PyperclipException as e:
         logger.error(f"Не удалось скопировать данные в буфер обмена: {e}")
-        logger.info("Попытка сохранить данные в файл вместо буфера обмена")
-        save_to_file(data_frame, "clipboard_data.tsv", sep="\t")
 
 
 def save_to_file(data: Union[pd.DataFrame, List[Dict[str, Any]]],

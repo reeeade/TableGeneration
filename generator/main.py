@@ -9,21 +9,22 @@ import json
 from typing import List, Optional, Dict, Any
 import pprint
 from datetime import datetime
-
+import asyncio
 from data_generator import (
     generate_user_data,
     generate_batch_user_data,
     generate_large_dataset,
-    validate_user_data
+    validate_user_data, generate_user_data_async
 )
 from clipboard_utils import export_data
 from gmaps_api import prefill_address_cache
 from config import COUNTRY_LOCALES, COUNTRY_NAMES
+from encoding_utils import setup_windows_console_encoding
 
 
 def setup_logging(log_level: str = 'INFO', log_file: Optional[str] = None) -> None:
     """
-    Настраивает логирование для приложения.
+    Настраивает логирование для приложения с поддержкой Unicode.
 
     Args:
         log_level: Уровень логирования ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
@@ -44,22 +45,69 @@ def setup_logging(log_level: str = 'INFO', log_file: Optional[str] = None) -> No
     # Настраиваем формат логирования
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-    # Создаем обработчики логов
-    handlers = [logging.StreamHandler(sys.stdout)]
+    # Создаем основной логгер
+    root_logger = logging.getLogger()
+    root_logger.setLevel(numeric_level)
+
+    # Очищаем существующие обработчики
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Создаем форматтер
+    formatter = logging.Formatter(log_format)
+
+    # Добавляем обработчик для консоли с поддержкой Unicode
+    # В Windows используем кодировку utf-8 для консоли
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(numeric_level)
+
+    # Для Windows Python 3.6+ можно использовать следующий код:
+    import sys
+    if sys.platform == 'win32':
+        # Пробуем настроить кодировку для консоли Windows
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            kernel32.SetConsoleCP(65001)  # UTF-8
+            kernel32.SetConsoleOutputCP(65001)  # UTF-8
+        except:
+            # Если не удалось переключить кодировку, используем транслитерацию для логов
+            class TransliteratingHandler(logging.StreamHandler):
+                def emit(self, record):
+                    try:
+                        msg = self.format(record)
+                        # Заменяем русские символы на латинские для логирования
+                        from unidecode import unidecode
+                        msg = unidecode(msg)
+                        stream = self.stream
+                        stream.write(msg + self.terminator)
+                        self.flush()
+                    except Exception:
+                        self.handleError(record)
+
+            console_handler = TransliteratingHandler()
+            console_handler.setFormatter(formatter)
+            console_handler.setLevel(numeric_level)
+
+    root_logger.addHandler(console_handler)
 
     # Если указан файл логов, добавляем обработчик для записи в файл
     if log_file:
-        handlers.append(logging.FileHandler(log_file))
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(numeric_level)
+        root_logger.addHandler(file_handler)
     else:
         # По умолчанию записываем в data_generator.log
-        handlers.append(logging.FileHandler('data_generator.log'))
+        file_handler = logging.FileHandler('data_generator.log', encoding='utf-8')
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(numeric_level)
+        root_logger.addHandler(file_handler)
 
-    # Настраиваем логгер
-    logging.basicConfig(
-        level=numeric_level,
-        format=log_format,
-        handlers=handlers
-    )
+    # Настраиваем логирование для библиотек
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('chardet').setLevel(logging.WARNING)
 
 
 def parse_arguments():
@@ -278,7 +326,7 @@ def interactive_mode():
 
     # Генерируем данные
     print(f"\nГенерация {num_users} пользователей из стран: {', '.join(country_codes)}...")
-    df = generate_user_data(num_users, country_codes)
+    df = asyncio.run(generate_user_data_async(num_users=num_users, country_codes=country_codes))
 
     # Экспортируем данные
     if output_format == 'clipboard':
@@ -305,6 +353,9 @@ def main():
     """
     Основная функция программы.
     """
+    # Настраиваем кодировку для Windows
+    setup_windows_console_encoding()
+
     args = parse_arguments()
 
     # Настраиваем логирование
@@ -362,10 +413,10 @@ def main():
     # Генерируем данные
     if args.large:
         logging.info(f"Генерация большого набора данных: {args.large} записей (размер партии: {args.batch_size})")
-        df = generate_large_dataset(args.large, args.batch_size, country_codes)
+        df = asyncio.run(generate_user_data_async(num_users=args.large, country_codes=country_codes))
     else:
         logging.info(f"Генерация данных для {args.num_users} пользователей из стран: {', '.join(country_codes)}")
-        df = generate_user_data(num_users=args.num_users, country_codes=country_codes)
+        df = asyncio.run(generate_user_data_async(num_users=args.num_users, country_codes=country_codes))
 
     # Проверяем данные, если запрошено
     if args.validate:

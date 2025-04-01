@@ -20,16 +20,14 @@ class User:
         creation: Дата создания аккаунта в формате DD.MM.YYYY
         proxy: Строка с настройками прокси
     """
-    id: str
-    geo: str
+    geo: str  # Оставляем гео-код
     apple_id: str
     password: str
     number: str
     name: str
     address: str
     birthday: str
-    creation: str
-    proxy: str
+    # Убираем лишние поля: id, number, proxy, creation и т.д.
 
 
 @dataclass

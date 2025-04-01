@@ -34,6 +34,23 @@ CACHE_FILE = "address_cache.json"
 # Инициализация кэша адресов
 address_cache = {}
 
+USED_ADDRESSES = set()
+
+
+def reset_used_addresses(func):
+    """
+    Декоратор для автоматической очистки USED_ADDRESSES
+    перед вызовом функции генерации данных
+    """
+
+    def wrapper(*args, **kwargs):
+        global USED_ADDRESSES
+        USED_ADDRESSES.clear()
+        logger.info("Список использованных адресов очищен перед генерацией")
+        return func(*args, **kwargs)
+
+    return wrapper
+
 
 def load_address_cache():
     """Загружает кэш адресов из файла."""
@@ -198,136 +215,138 @@ def extract_address_components(address_components: List[Dict[str, Any]]) -> Dict
 
 def generate_address(country_code: str) -> Optional[str]:
     """
-    Генерирует адрес жилого здания в заданной стране с использованием Google Maps Places API.
-    Использует кэширование для уменьшения количества запросов к API.
-
-    Args:
-        country_code: Код страны
-
-    Returns:
-        Строка с адресом или None, если адрес не может быть сгенерирован
+    Генерирует уникальный адрес жилого здания в заданной стране.
     """
-    # Пробуем получить адрес из кэша (с вероятностью 70%)
-    if random.random() < 0.7:
-        cached_address = get_cached_address(country_code)
-        if cached_address:
-            logger.info(f"Использован кэшированный адрес для страны {country_code}")
-            return cached_address
+    # Максимальное количество попыток генерации уникального адреса
+    max_unique_attempts = 10
 
-    # Если не получили адрес из кэша, генерируем новый
-    logger.info(f"Генерация нового адреса для страны {country_code}")
+    for _ in range(max_unique_attempts):
+        # Пробуем получить адрес из кэша (с вероятностью 70%)
+        if random.random() < 0.7:
+            cached_address = get_cached_address(country_code)
+            if cached_address and cached_address not in USED_ADDRESSES:
+                logger.info(f"Использован кэшированный адрес для страны {country_code}")
+                USED_ADDRESSES.add(cached_address)
+                return cached_address
 
-    # Получаем координаты для заданной страны
-    locations = CITY_COORDINATES.get(country_code, [])
-    if not locations:
-        logger.error(f"Нет координат для страны: {country_code}")
-        return None
+        # Если не получили уникальный адрес из кэша, генерируем новый
+        logger.info(f"Генерация нового адреса для страны {country_code}")
 
-    # Выбираем случайную локацию
-    location = random.choice(locations)
+        # Получаем координаты для заданной страны
+        locations = CITY_COORDINATES.get(country_code, [])
+        if not locations:
+            logger.error(f"Нет координат для страны: {country_code}")
+            return None
 
-    # Получаем информацию о радиусе поиска
-    radius_info = RADIUS_DATA.get(country_code, {})
-    if not radius_info:
-        logger.error(f"Нет данных по радиусу для страны: {country_code}")
-        return None
+        # Выбираем случайную локацию
+        location = random.choice(locations)
 
-    # Определяем радиус поиска в зависимости от локации
-    radius = (radius_info.get("border")
-              if location in radius_info.get("border_cities", [])
-              else radius_info.get("default"))
+        # Получаем информацию о радиусе поиска
+        radius_info = RADIUS_DATA.get(country_code, {})
+        if not radius_info:
+            logger.error(f"Нет данных по радиусу для страны: {country_code}")
+            return None
 
-    # Максимальное количество попыток получения адреса
-    max_attempts = GMAPS_CONFIG['max_retries']
-    attempt = 0
+        # Определяем радиус поиска в зависимости от локации
+        radius = (radius_info.get("border")
+                  if location in radius_info.get("border_cities", [])
+                  else radius_info.get("default"))
 
-    while attempt < max_attempts:
-        try:
-            # Получаем список мест поблизости
-            places = get_nearby_places(location, radius)
+        # Максимальное количество попыток получения адреса
+        max_attempts = GMAPS_CONFIG['max_retries']
+        attempt = 0
 
-            if not places:
-                logger.warning(f"Нет подходящих мест для локации {location}")
-                attempt += 1
-                continue
+        while attempt < max_attempts:
+            try:
+                # Получаем список мест поблизости
+                places = get_nearby_places(location, radius)
 
-            # Выбираем случайное место
-            place = random.choice(places)
-            place_id = place.get("place_id")
-
-            # Получаем подробности о месте
-            details = get_place_details(place_id)
-
-            # Если не получили детали, пробуем использовать форматированный адрес из результатов поиска
-            if not details:
-                formatted = place.get("formatted_address")
-                if formatted and re.search(r'\d+', formatted):
-                    address = normalize_string(formatted)
-                    if is_valid_address(address):
-                        # Удаляем название страны, если оно присутствует
-                        if COUNTRY_NAMES.get(country_code) and COUNTRY_NAMES[country_code] in address:
-                            address = remove_country_from_address(address, COUNTRY_NAMES[country_code])
-
-                        # Добавляем в кэш и возвращаем
-                        add_to_cache(country_code, address)
-                        return address
-                attempt += 1
-                continue
-
-            # Извлекаем компоненты адреса
-            address_components = details.get("address_components", [])
-            if not address_components:
-                attempt += 1
-                continue
-
-            # Извлекаем компоненты адреса
-            components = extract_address_components(address_components)
-
-            # Проверяем наличие необходимых компонентов
-            required_components = GMAPS_CONFIG['required_components']
-            if not all(comp in components for comp in required_components):
-                # Если номер дома отсутствует, считаем адрес недействительным
-                if 'street_number' not in components:
-                    logger.info("Номер дома не найден в адресе, повторяем запрос...")
+                if not places:
+                    logger.warning(f"Нет подходящих мест для локации {location}")
                     attempt += 1
                     continue
 
-            # Форматируем адрес
-            formatted_address = format_address_components(components)
+                # Выбираем случайное место
+                place = random.choice(places)
+                place_id = place.get("place_id")
 
-            # Если не удалось сформировать адрес, пробуем использовать форматированный адрес из API
-            if not formatted_address:
-                formatted_address = details.get("formatted_address")
-                if not formatted_address or not re.search(r'\d+', formatted_address):
+                # Получаем подробности о месте
+                details = get_place_details(place_id)
+
+                # Если не получили детали, пробуем использовать форматированный адрес из результатов поиска
+                if not details:
+                    formatted = place.get("formatted_address")
+                    if formatted and re.search(r'\d+', formatted):
+                        address = normalize_string(formatted)
+                        if is_valid_address(address) and address not in USED_ADDRESSES:
+                            # Удаляем название страны, если оно присутствует
+                            if COUNTRY_NAMES.get(country_code) and COUNTRY_NAMES[country_code] in address:
+                                address = remove_country_from_address(address, COUNTRY_NAMES[country_code])
+
+                            # Добавляем в кэш, список использованных и возвращаем
+                            add_to_cache(country_code, address)
+                            USED_ADDRESSES.add(address)
+                            return address
                     attempt += 1
                     continue
 
-            # Нормализуем адрес
-            normalized = normalize_string(formatted_address)
+                # Извлекаем компоненты адреса
+                address_components = details.get("address_components", [])
+                if not address_components:
+                    attempt += 1
+                    continue
 
-            # Удаляем название страны, если оно присутствует
-            if COUNTRY_NAMES.get(country_code) and COUNTRY_NAMES[country_code] in normalized:
-                normalized = remove_country_from_address(normalized, COUNTRY_NAMES[country_code])
+                # Извлекаем компоненты адреса
+                components = extract_address_components(address_components)
 
-            # Проверяем валидность адреса
-            if is_valid_address(normalized):
-                # Добавляем в кэш и возвращаем
-                add_to_cache(country_code, normalized)
-                return normalized
+                # Проверяем наличие необходимых компонентов
+                required_components = GMAPS_CONFIG['required_components']
+                if not all(comp in components for comp in required_components):
+                    # Если номер дома отсутствует, считаем адрес недействительным
+                    if 'street_number' not in components:
+                        logger.info("Номер дома не найден в адресе, повторяем запрос...")
+                        attempt += 1
+                        continue
 
-        except googlemaps.exceptions.ApiError as e:
-            logger.error(f"Google Maps API error: {e}")
-        except Exception as e:
-            logger.exception("Неожиданная ошибка при вызове Google Maps API")
+                # Форматируем адрес
+                formatted_address = format_address_components(components)
 
-        # Увеличиваем счетчик попыток и ждем перед повторным запросом
-        attempt += 1
-        if attempt < max_attempts:
-            sleep_time = GMAPS_CONFIG['retry_base_delay'] ** attempt
-            logger.info(f"Попытка {attempt}/{max_attempts} не удалась, повтор через {sleep_time} сек...")
-            time.sleep(sleep_time)
+                # Если не удалось сформировать адрес, пробуем использовать форматированный адрес из API
+                if not formatted_address:
+                    formatted_address = details.get("formatted_address")
+                    if not formatted_address or not re.search(r'\d+', formatted_address):
+                        attempt += 1
+                        continue
 
-    logger.error(f"Не удалось получить адрес с номером дома для страны {country_code} после {max_attempts} попыток.")
+                # Нормализуем адрес
+                normalized = normalize_string(formatted_address)
+
+                # Удаляем название страны, если оно присутствует
+                if COUNTRY_NAMES.get(country_code) and COUNTRY_NAMES[country_code] in normalized:
+                    normalized = remove_country_from_address(normalized, COUNTRY_NAMES[country_code])
+
+                # Проверяем валидность и уникальность адреса
+                if is_valid_address(normalized) and normalized not in USED_ADDRESSES:
+                    # Добавляем в кэш, список использованных и возвращаем
+                    add_to_cache(country_code, normalized)
+                    USED_ADDRESSES.add(normalized)
+                    return normalized
+
+            except googlemaps.exceptions.ApiError as e:
+                logger.error(f"Google Maps API error: {e}")
+            except Exception as e:
+                logger.exception("Неожиданная ошибка при вызове Google Maps API")
+
+            # Увеличиваем счетчик попыток и ждем перед повторным запросом
+            attempt += 1
+            if attempt < max_attempts:
+                sleep_time = GMAPS_CONFIG['retry_base_delay'] ** attempt
+                logger.info(f"Попытка {attempt}/{max_attempts} не удалась, повтор через {sleep_time} сек...")
+                time.sleep(sleep_time)
+
+        logger.error(
+            f"Не удалось получить уникальный адрес для страны {country_code} после {max_unique_attempts} попыток.")
+
     return None
 
 

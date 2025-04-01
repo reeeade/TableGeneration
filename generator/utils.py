@@ -302,7 +302,7 @@ async def run_concurrent_tasks(tasks, max_workers=10):
         return await asyncio.gather(*futures)
 
 
-def generate_email(name: str, domain: str = None) -> str:
+def generate_email(name: str, domain: str = None, generate: bool = True) -> str:
     """
     Генерирует email на основе имени пользователя.
 
@@ -313,6 +313,8 @@ def generate_email(name: str, domain: str = None) -> str:
     Returns:
         Сгенерированный email
     """
+    if not generate:
+        return ""
     if domain is None:
         domains = ["gmail.com", "outlook.com", "yahoo.com", "protonmail.com",
                    "icloud.com", "mail.com", "zoho.com", "aol.com"]
@@ -341,7 +343,7 @@ def generate_email(name: str, domain: str = None) -> str:
 
 # Дополнение к utils.py - улучшенная генерация телефонных номеров
 
-def generate_phone_number(country_code: str, phone_prefix: str = None) -> str:
+def generate_phone_number(country_code: str, phone_prefix: str = None, generate: bool = True) -> str:
     """
     Генерирует телефонный номер для указанной страны с учетом международного формата.
 
@@ -353,6 +355,8 @@ def generate_phone_number(country_code: str, phone_prefix: str = None) -> str:
     Returns:
         Строка с телефонным номером в международном формате
     """
+    if not generate:
+        return ""
     from config import get_country_phone_code
     import random
 

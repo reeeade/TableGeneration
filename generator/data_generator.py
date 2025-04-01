@@ -17,7 +17,7 @@ from config import (
     COUNTRY_NAMES,
     get_country_phone_code
 )
-from gmaps_api import generate_address
+from gmaps_api import generate_address, reset_used_addresses
 from utils import (
     generate_birth_date,
     generate_strong_compliant_password,
@@ -229,16 +229,13 @@ async def create_user_record(country: str) -> Dict[str, Any]:
 
                 # Создаем основную запись пользователя
                 user = User(
-                    id=user_id,
-                    geo=country,
-                    apple_id=email,
-                    password=password,
-                    number=phone,
-                    name=name,
-                    address=address,
-                    birthday=birth_date,
-                    creation=creation_date,
-                    proxy=proxy,
+                    geo=country,  # Сохраняем гео-код
+                    apple_id="",
+                    password=generate_strong_compliant_password(),
+                    number="",
+                    name=generate_name(country),
+                    address=address or "",
+                    birthday=generate_birth_date()
                 )
 
                 # Создаем запись в виде словаря
@@ -247,7 +244,15 @@ async def create_user_record(country: str) -> Dict[str, Any]:
                 # Добавляем информацию о стране в формате ISO и название
                 user_data['country_name'] = COUNTRY_NAMES.get(country, country)
 
-                return user_data
+                return {
+                    "geo": user.geo,
+                    "AppleID": user.apple_id,
+                    "pass": user.password,
+                    "number": user.number,
+                    "name": user.name,
+                    "address": user.address,
+                    "birthday": user.birthday
+                }
 
             attempts += 1
             logger.info(f"Не удалось получить адрес для страны {country} (попытка {attempts}/{max_attempts}).")
@@ -265,14 +270,14 @@ async def create_user_record(country: str) -> Dict[str, Any]:
     # Создаем запись с пустым адресом
     user_id = str(uuid.uuid4())
     name = generate_name(country)
-    email = generate_email(name)
+    email = generate_email(name, generate=False)
     birth_date = generate_birth_date()
     password = generate_strong_compliant_password()
     proxy = generate_correct_proxy(country)
 
     # Генерируем телефонный номер на основе кода страны
     country_code = get_country_phone_code(country)
-    phone = generate_phone_number(country, country_code)
+    phone = generate_phone_number(country, generate=False)
 
     creation_date = generate_creation_date()
 
@@ -298,54 +303,48 @@ async def create_user_record(country: str) -> Dict[str, Any]:
     return user_data
 
 
+@reset_used_addresses
 async def generate_user_data_async(num_users: int = 20, country_codes: Optional[List[str]] = None) -> pd.DataFrame:
-    """
-    Асинхронно генерирует DataFrame с пользовательскими данными.
-
-    Args:
-        num_users: Количество пользователей для генерации
-        country_codes: Список кодов стран. Если None, используются все доступные страны.
-
-    Returns:
-        DataFrame с данными пользователей
-    """
     if country_codes is None:
         country_codes = list(COUNTRY_LOCALES.keys())
     else:
         # Проверяем, что все коды стран существуют
-        valid_country_codes = []
-        for code in country_codes:
-            if code in COUNTRY_LOCALES:
-                valid_country_codes.append(code)
-            else:
-                logger.warning(f"Код страны {code} не найден в списке поддерживаемых стран")
+        valid_country_codes = [code for code in country_codes if code in COUNTRY_LOCALES]
 
         if not valid_country_codes:
             logger.error("Ни один из указанных кодов стран не найден в списке поддерживаемых стран")
-            country_codes = ['US']  # Используем США по умолчанию
-        else:
-            country_codes = valid_country_codes
+            valid_country_codes = ['US']
 
-    # Распределяем пользователей по странам
-    countries = random.choices(country_codes, k=num_users)
+        country_codes = valid_country_codes
 
-    # Создаем задачи для асинхронного выполнения
-    tasks = [create_user_record(country) for country in countries]
+    # Равномерное распределение пользователей
+    country_counts = {country: num_users // len(country_codes) for country in country_codes}
+    remainder = num_users % len(country_codes)
 
-    # Запускаем задачи с ограничением на количество одновременных задач
-    max_workers = min(20, num_users)  # Максимум 20 одновременных задач
+    # Распределяем остаток
+    for i in range(remainder):
+        country_counts[country_codes[i]] += 1
 
-    logger.info(f"Генерация данных для {num_users} пользователей из стран: {', '.join(set(countries))}")
+    # Создаем задачи
+    tasks = []
+    for country, count in country_counts.items():
+        tasks.extend([create_user_record(country) for _ in range(count)])
 
-    # Используем семафор для ограничения одновременных задач
+    logger.info(f"Генерация данных для {num_users} пользователей из стран: {', '.join(country_counts.keys())}")
+
+    # Максимум 20 одновременных задач
+    max_workers = min(20, num_users)
     semaphore = asyncio.Semaphore(max_workers)
 
-    async def limited_task(country):
+    async def limited_task(task):
         async with semaphore:
-            return await create_user_record(country)
+            return await task
 
     # Запускаем задачи с ограничением
-    data = await asyncio.gather(*[limited_task(country) for country in countries])
+    data = await asyncio.gather(*[limited_task(task) for task in tasks])
+
+    # Перемешиваем данные перед созданием DataFrame
+    random.shuffle(data)
 
     return pd.DataFrame(data)
 
