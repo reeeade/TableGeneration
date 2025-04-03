@@ -1,7 +1,9 @@
 # clipboard_utils.py
-import pyperclip
-import pandas as pd
 import logging
+
+import pandas as pd
+import pyperclip
+
 
 def copy_to_clipboard(data_frame: pd.DataFrame) -> None:
     """

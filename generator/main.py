@@ -1,12 +1,13 @@
 # main.py
 
 import logging
-from data_generator import generate_user_data
+
 from clipboard_utils import copy_to_clipboard
+from data_generator import generate_user_data
 
 
 # Доступные страны:
-# ["ES", "DE", "FR", "GB", "PL", "NL", "AT", "DK", "UA", "RO", "EE", "LV", "LT", "BG", "GE", "FI", "CZ", "IT","US"]
+# ["ES", "DE", "FR", "GB", "PL", "NL", "AT", "DK", "UA", "RO", "EE", "LV", "LT", "BG", "GE", "FI", "CZ", "IT", "US"]
 
 def main():
     logging.basicConfig(level=logging.INFO)
