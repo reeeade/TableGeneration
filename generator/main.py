@@ -6,7 +6,7 @@ from clipboard_utils import copy_to_clipboard
 
 
 # Доступные страны:
-# ["ES", "DE", "FR", "GB", "PL", "NL", "AT", "DK", "UA", "RO", "EE", "LV", "LT", "BG", "GE", "FI", "CZ", "IT"]
+# ["ES", "DE", "FR", "GB", "PL", "NL", "AT", "DK", "UA", "RO", "EE", "LV", "LT", "BG", "GE", "FI", "CZ", "IT","US"]
 
 def main():
     logging.basicConfig(level=logging.INFO)

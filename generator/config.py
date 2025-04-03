@@ -9,6 +9,7 @@ if not GOOGLE_MAPS_API_KEY:
     raise ValueError("GOOGLE_MAPS_API_KEY не установлен в переменных окружения.")
 
 COUNTRY_LOCALES = {
+    'US': 'en_US',
     'ES': 'es_ES',
     'DE': 'de_DE',
     'FR': 'fr_FR',
@@ -31,6 +32,7 @@ COUNTRY_LOCALES = {
 
 # Сопоставление кода страны с названием страны
 COUNTRY_NAMES = {
+    'US': 'United States',
     'ES': 'Spain',
     'DE': 'Germany',
     'FR': 'France',
@@ -52,6 +54,21 @@ COUNTRY_NAMES = {
 }
 
 CITY_COORDINATES = {
+    'US': [
+        '40.712776,-74.005974',  # New York
+        '34.052235,-118.243683',  # Los Angeles
+        '41.881832,-87.623177',  # Chicago
+        '29.760427,-95.369803',  # Houston
+        '33.448376,-112.074036',  # Phoenix
+        '39.952583,-75.165222',  # Philadelphia
+        '38.627003,-90.199404',  # St. Louis
+        '37.774929,-122.419416',  # San Francisco
+        '47.606209,-122.332069',  # Seattle
+        '25.761681,-80.199568',  # Miami
+        '39.739235,-104.990250',  # Denver
+        '32.715738,-117.161084',  # San Diego
+        '42.331427,-83.045754'  # Detroit
+    ],
     'ES': [
         '40.416775,-3.703790',  # Madrid
         '41.385064,2.173403',  # Barcelona
@@ -310,6 +327,17 @@ CITY_COORDINATES = {
 }
 
 RADIUS_DATA = {
+    'US': {
+        'default': 50000,  # Немного больше из-за больших расстояний
+        'border': 30000,
+        'border_cities': [
+            '40.712776,-74.005974',  # New York
+            '34.052235,-118.243683',  # Los Angeles
+            '41.881832,-87.623177',  # Chicago
+            '29.760427,-95.369803',  # Houston
+            '47.606209,-122.332069',  # Seattle
+        ]
+    },
     'ES': {
         'default': 30000,
         'border': 20000,
